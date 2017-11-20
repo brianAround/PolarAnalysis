@@ -20,7 +20,7 @@ import TextIOUtility
 
 
 
-hash_tag = 'Men'
+hash_tag = 'Hillary Clinton'
 # select_date = '11/8/2017'
 sample_size = 3000
 
@@ -98,7 +98,6 @@ def search_term(search_text:str, count=100, date_start=None, twitter=None):
     srch = twitter.search(q=search_text, count=count)  #, tweet_mode='extended'
     rate_limit = twitter.get_lastfunction_header('x-rate-limit-limit')
     remaining_limit = twitter.get_lastfunction_header('x-rate-limit-remaining')
-    reset_raw = tw.get_lastfunction_header('x-rate-limit-reset')
     print(remaining_limit, '/', rate_limit)
     tweets = srch['statuses']
     min_id = min([t['id'] for t in tweets])
@@ -110,17 +109,13 @@ def search_term(search_text:str, count=100, date_start=None, twitter=None):
         tweets = srch['statuses']
         min_id = min(min_id, min([t['id'] for t in tweets]))
         result.extend(tweets)
-        if reset_raw is not None and remaining_limit is not None and int(remaining_limit) < 2:
-            reset_raw = int(reset_raw)
-            reset_struct = time.localtime(reset_raw)
-            reset_time = time.asctime(reset_struct)
-            print('resets:', reset_time)
+        print(remaining_limit, '/', rate_limit)
+        if remaining_limit is not None and int(remaining_limit) < 2:
             diff = 15
             while diff > 0:
                 print('Wait:', diff, 'minutes')
                 time.sleep(60)
                 diff -= 1
-        print(remaining_limit, '/', rate_limit)
     return result
 
 tw = configure_client()
