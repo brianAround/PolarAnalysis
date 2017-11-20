@@ -1,0 +1,12 @@
+sometimes	2
+it	17
+feels	1
+like	10
+the	67
+world	4
+is	36
+crashing	1
+around	2
+me	7
+	193
+fridayfeeling	267
