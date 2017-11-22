@@ -20,12 +20,14 @@ import TextIOUtility
 
 
 
-hash_tag = 'Hillary Clinton'
+hash_tag = '#LesserKnownDutiesOfTheQueen'
 # select_date = '11/8/2017'
 sample_size = 3000
 
 # Problems to solve
 # download a set of available tweets using a criteria
+# config_file = 'ScrambledPratchett.ini'
+# config_file = 'ScrambledDouglasAdams.ini'
 config_file = 'Oracle.ini'
 TwitterOptions = namedtuple('TwitterOptions', 'app_key,app_secret,acct_key,acct_secret')
 
@@ -34,6 +36,13 @@ TweetInfo = namedtuple('TweetInfo', 'account,id,datetime,text')
 status_by_id = {}
 count_by_original_id = Counter()
 
+called_show_status = Counter()
+
+def call_show_status(id, tw):
+    called_show_status[id] += 1
+    status = tw.show_status(id=id, tweet_mode='extended')
+    status_by_id[id] = status
+    return status
 
 def configure_client(use_config_path=None):
     if use_config_path is None:
@@ -56,7 +65,7 @@ def get_status(id, twitter:Twython=None):
     if twitter is None:
         twitter = configure_client()
     try:
-        status = twitter.show_status(id=id, tweet_mode='extended')
+        status = call_show_status(id, twitter)
         rate_limit = tw.get_lastfunction_header('x-rate-limit-limit')
         remaining_limit = tw.get_lastfunction_header('x-rate-limit-remaining')
         reset_raw = tw.get_lastfunction_header('x-rate-limit-reset')
@@ -90,6 +99,8 @@ def get_status(id, twitter:Twython=None):
     return status
 
 
+
+
 # next we add the ability to narrow to a date or other thing like it.
 def search_term(search_text:str, count=100, date_start=None, twitter=None):
     result = []
@@ -117,6 +128,7 @@ def search_term(search_text:str, count=100, date_start=None, twitter=None):
                 time.sleep(60)
                 diff -= 1
     return result
+
 
 tw = configure_client()
 tweets = search_term(hash_tag, sample_size, tw)
@@ -161,23 +173,31 @@ pos_terms = TextIOUtility.load_dictionary(pos_path)
 neg_terms = TextIOUtility.load_dictionary(neg_path)
 pos_path = os.path.join(os.path.join('data','extra'), 'positive.txt')
 neg_path = os.path.join(os.path.join('data','extra'), 'negative.txt')
-pos_terms = TextIOUtility.load_dictionary(pos_path, False, pos_terms)
-neg_terms = TextIOUtility.load_dictionary(neg_path, False, neg_terms)
+amb_path = os.path.join(os.path.join('data','extra'), 'ambivalent.txt')
+pos_terms = TextIOUtility.load_dictionary(pos_path, False, pos_terms, use_encoding='utf-16')
+neg_terms = TextIOUtility.load_dictionary(neg_path, False, neg_terms, use_encoding='utf-16')
+amb_terms = TextIOUtility.load_dictionary(amb_path, False, use_encoding='utf-16')
+
 
 # score each stored tweet and output the results
-def score_text(text, positive_terms, negative_terms, unknown:Counter=None):
+def score_text(text, positive_terms, negative_terms, unknown: Counter=None, ignore_terms=None):
     result = 0
-    words = [w.lower().strip(string.punctuation) for w in text.split()]
+    words = [w for w in text.split()]
     for w in words:
-        word = w[1:] if w.startswith('#') and len(w) > 1 else w
-        if word in pos_terms:
+        word = w.lower().strip(string.punctuation)
+        if w.startswith('#'):
+            word = '#' + word
+        elif w.startswith('http://') or w.startswith('https://'):
+            word = w
+        if word in positive_terms:
             result += 1
-        elif word in neg_terms:
+        elif word in negative_terms:
             result -= 1
         elif unknown is not None:
-            unknown[word] += 1
-
+            if ignore_terms is None or word not in ignore_terms:
+                unknown[word] += 1
     return result
+
 
 pos_results = []
 other_results = []
@@ -187,9 +207,10 @@ other_terms = Counter()
 other_neg = Counter()
 other_positive = Counter()
 
+
 for t in results:
     current_other = Counter()
-    score = score_text(t.text, pos_terms, neg_terms, current_other)
+    score = score_text(t.text, pos_terms, neg_terms, current_other, ignore_terms=amb_terms)
     for term in current_other:
         other_terms[term] += current_other[term]
         if score > 0:
@@ -215,15 +236,18 @@ for t in pos_results:
     print(t[0], t[1])
 
 
-filepath = 'Unrec ' + hash_tag.replace('#','Hash-') + '.txt'
-output_terms  = {}
+file_path = 'Unrec ' + hash_tag.replace('#', 'Hash-') + '.txt'
+output_terms = {}
 for term in other_terms:
     output_terms[term] = (other_terms[term], other_positive[term], other_neg[term], )
-print('Storing',len(other_terms),'Unrecognized terms as', filepath)
-TextIOUtility.dictionary_dump(filepath, output_terms)
+print('Storing', len(other_terms), 'Unrecognized terms as', file_path)
+TextIOUtility.dictionary_dump(file_path, output_terms)
 
 print('FULL RESULTS')
 print('Positive:', len(pos_results))
 print('Neutral:', len(other_results))
 print('Negative:', len(neg_results))
 
+for status_id in called_show_status:
+    if called_show_status[status_id] > 1:
+        print(status_id, called_show_status[status_id])
