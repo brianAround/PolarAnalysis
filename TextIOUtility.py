@@ -3,16 +3,18 @@ import os
 from os.path import join
 
 
-
-def load_dictionary(file_path, has_values=False, target_dict=None):
+def load_dictionary(file_path, has_values=False, target_dict=None, use_encoding='utf-8'):
     result = {} if target_dict is None else target_dict
     file_size = min(32, os.path.getsize(file_path))
-    with open(file_path, 'rb') as f_enc:
-        raw = f_enc.read(file_size)
-        if raw.startswith(codecs.BOM_UTF8):
-            encoding = 'utf-8-sig'
-        else:
-            encoding = 'utf-8'
+    if use_encoding == 'utf-8':
+        with open(file_path, 'rb') as f_enc:
+            raw = f_enc.read(file_size)
+            if raw.startswith(codecs.BOM_UTF8):
+                encoding = 'utf-8-sig'
+            else:
+                encoding = use_encoding
+    else:
+        encoding = use_encoding
     with open(file_path, 'r', encoding=encoding) as f_handle:
         for line in f_handle:
             if has_values:
